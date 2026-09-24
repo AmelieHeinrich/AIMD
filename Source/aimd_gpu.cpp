@@ -274,14 +274,19 @@ uint32_t aimdGpuBeginFrame(agfxCommandBuffer* commandBuffer, uint32_t frameIndex
     memcpy(agfxBufferMap(gpu.headers[frameIndex]), &header, sizeof(header));
     agfxBufferUnmap(gpu.headers[frameIndex]);
 
-    // Reset the counters. Last frame, the geometry was read by vertex shaders and the counters by a copy.
+    // Reset the counters. Last frame, the geometry was read by vertex shaders. The counters were left in
+    // COPY_SOURCE if autoGrow read them back in aimdGpuFinish, or in UNORDERED_ACCESS otherwise (the state
+    // the compute pass left them in) -- the barrier here must match whichever actually happened.
     agfxCommandBufferMemoryBarrier(commandBuffer, AGFX_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, AGFX_RESOURCE_STATE_COPY_DEST, 1);
-    agfxCommandBufferMemoryBarrier(commandBuffer, AGFX_RESOURCE_STATE_COPY_SOURCE, AGFX_RESOURCE_STATE_COPY_DEST, 1);
+    // Buffer-scoped (not the global barrier above): gpu.counters is a real CopyBufferRegion source/dest,
+    // and the D3D12 debug layer's legacy state validator for that only updates from a barrier naming the
+    // resource -- see agfxCommandBufferBufferBarrier's doc comment.
+    agfxCommandBufferBufferBarrier(commandBuffer, gpu.counters, gpu.autoGrow ? AGFX_RESOURCE_STATE_COPY_SOURCE : AGFX_RESOURCE_STATE_UNORDERED_ACCESS, AGFX_RESOURCE_STATE_COPY_DEST, 1);
     agfxComputePass* pass = agfxComputePassBegin(commandBuffer, "AIMD GPU Begin");
     agfxComputePassCopyBufferToBuffer(pass, gpu.zero, gpu.counters, 0, 0, AIMD_GPU_COUNTERS_SIZE);
     agfxComputePassEnd(pass);
     // Flushed when the user's compute pass begins
-    agfxCommandBufferMemoryBarrier(commandBuffer, AGFX_RESOURCE_STATE_COPY_DEST, AGFX_RESOURCE_STATE_UNORDERED_ACCESS, 1);
+    agfxCommandBufferBufferBarrier(commandBuffer, gpu.counters, AGFX_RESOURCE_STATE_COPY_DEST, AGFX_RESOURCE_STATE_UNORDERED_ACCESS, 1);
 
     gpu.frameActive = true;
     gpu.activeFrameIndex = frameIndex;
@@ -324,7 +329,7 @@ void aimdGpuFinish(aimdContext* ctx, agfxCommandBuffer* commandBuffer) {
     uint32_t frameIndex = gpu.activeFrameIndex;
 
     if (gpu.autoGrow) {
-        agfxCommandBufferMemoryBarrier(commandBuffer, AGFX_RESOURCE_STATE_UNORDERED_ACCESS, AGFX_RESOURCE_STATE_COPY_SOURCE, 1);
+        agfxCommandBufferBufferBarrier(commandBuffer, gpu.counters, AGFX_RESOURCE_STATE_UNORDERED_ACCESS, AGFX_RESOURCE_STATE_COPY_SOURCE, 1);
         agfxComputePass* pass = agfxComputePassBegin(commandBuffer, "AIMD GPU Readback");
         agfxComputePassCopyBufferToBuffer(pass, gpu.counters, gpu.readbacks[frameIndex], 0, 0, AIMD_GPU_COUNTERS_SIZE);
         agfxComputePassEnd(pass);

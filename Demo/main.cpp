@@ -57,6 +57,9 @@ static agfxShaderModule* CompileShader(agfxDevice* device, const std::string& so
     options.sourceCode = (char*)source.data();
     options.sourceCodeSize = (uint32_t)source.size();
     options.dxCompilerPath = "Binaries/libdxcompiler.so"; // Linux only, relative to the run directory
+    // Without this, GPU-Based Validation can only report a raw descriptor index and shader stage, not
+    // the HLSL source line or variable name behind it.
+    options.addDebugSymbols = 1;
 
     agfxShaderCompilerResult result = {};
     agfxCompileShader(&options, &result);
@@ -212,9 +215,7 @@ int main(int, char**) {
     deviceInfo.tempAllocate = DemoAllocate;
     deviceInfo.tempFree = DemoFree;
     deviceInfo.logFunction = DemoLog;
-#if !defined(NDEBUG)
     deviceInfo.enableValidation = 1;
-#endif
 
     // Native window handle for the swap chain
     void* windowHandle = nullptr;
