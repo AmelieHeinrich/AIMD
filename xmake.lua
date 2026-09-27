@@ -62,7 +62,8 @@ target("agfx_shader")
 target_end()
 
 --
--- aimd: the debug renderer library
+-- aimd: the debug renderer library, from Include/ and Source/. For projects that consume AIMD through xmake;
+-- everyone else can drop dist/ into their tree instead.
 --
 target("aimd")
     set_kind("static")
@@ -73,16 +74,16 @@ target("aimd")
 target_end()
 
 --
--- aimd_demo: SDL3 + ImGui showcase
+-- aimd_demo: SDL3 + ImGui showcase. Uses the single-header build from dist/, regenerated before every build.
 --
 target("aimd_demo")
     set_kind("binary")
-    add_deps("aimd", "agfx_shader")
+    add_deps("agfx", "agfx_shader")
     add_packages("libsdl3", "imgui", "glm")
     add_defines("GLM_FORCE_DEPTH_ZERO_TO_ONE", "GLM_FORCE_RADIANS")
+    add_includedirs("dist", "ThirdParty/agfx_imgui")
     add_files("Demo/*.cpp")
     add_files("ThirdParty/agfx_imgui/imgui_impl_agfx.cpp")
-    add_includedirs("ThirdParty/agfx_imgui")
     set_rundir("$(projectdir)")
 
     if is_plat("macosx") then
@@ -90,6 +91,10 @@ target("aimd_demo")
     elseif is_plat("linux") then
         add_rpathdirs("$ORIGIN")
     end
+
+    before_build(function (target)
+        import("amalgamate", { rootdir = path.join(os.projectdir(), "Scripts") })()
+    end)
 
     -- Runtime shader compiler libraries next to the executable
     after_build(function (target)
@@ -103,3 +108,14 @@ target("aimd_demo")
         end
     end)
 target_end()
+
+--
+-- xmake amalgamate: regenerates dist/ (aimd.h, AIMD.hlsl, AIMDDebug.hlsli) from Include/, Source/ and Shaders/
+--
+task("amalgamate")
+    set_category("action")
+    on_run(function ()
+        import("amalgamate", { rootdir = path.join(os.projectdir(), "Scripts") })()
+    end)
+    set_menu({ usage = "xmake amalgamate", description = "Regenerate the single-header build in dist/", options = {} })
+task_end()

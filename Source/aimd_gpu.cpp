@@ -18,10 +18,9 @@
 #include <algorithm>
 #include <cstring>
 
-static constexpr uint32_t kDefaultGpuCapacity = 16384;
-static constexpr uint32_t kDefaultGpuMaxCapacity = 2u * 1024u * 1024u;
-static constexpr uint32_t kFinalizeGroupSize = 8; // Must match [numthreads] of FinalizeCS
-static constexpr uint32_t kInvalidHandle = 0xFFFFFFFFu;
+static constexpr uint32_t AIMD_DEFAULT_GPU_CAPACITY = 16384;
+static constexpr uint32_t AIMD_DEFAULT_GPU_MAX_CAPACITY = 2u * 1024u * 1024u;
+static constexpr uint32_t AIMD_FINALIZE_GROUP_SIZE = 8; // Must match [numthreads] of FinalizeCS
 
 static void aimdDestroyGeometry(aimdContext* ctx, aimdGpuGeometry& geometry) {
     if (geometry.readView)
@@ -100,20 +99,20 @@ bool aimdGpuCreate(aimdContext* ctx, const aimdContextCreateInfo* createInfo) {
 
     gpu.enabled = true;
     gpu.autoGrow = createInfo->gpuAutoGrow != 0;
-    gpu.maxCapacity = createInfo->gpuMaxCapacity ? createInfo->gpuMaxCapacity : kDefaultGpuMaxCapacity;
+    gpu.maxCapacity = createInfo->gpuMaxCapacity ? createInfo->gpuMaxCapacity : AIMD_DEFAULT_GPU_MAX_CAPACITY;
     gpu.finalizeShader = createInfo->finalizeComputeShader;
 
     agfxComputePipelineCreateInfo pipelineInfo = {};
     pipelineInfo.name = "AIMD Finalize";
     pipelineInfo.computeShader = gpu.finalizeShader;
-    pipelineInfo.groupSizeX = kFinalizeGroupSize;
+    pipelineInfo.groupSizeX = AIMD_FINALIZE_GROUP_SIZE;
     pipelineInfo.groupSizeY = 1;
     pipelineInfo.groupSizeZ = 1;
     gpu.finalizePipeline = agfxComputePipelineCreate(ctx->device, &pipelineInfo);
     if (!gpu.finalizePipeline)
         return false;
 
-    uint32_t capacity = createInfo->gpuInitialCapacity ? createInfo->gpuInitialCapacity : kDefaultGpuCapacity;
+    uint32_t capacity = createInfo->gpuInitialCapacity ? createInfo->gpuInitialCapacity : AIMD_DEFAULT_GPU_CAPACITY;
     capacity = std::min(capacity, gpu.maxCapacity / 3);
     for (uint32_t r = 0; r < AIMD_REGION_COUNT; ++r)
         gpu.regionCapacity[r] = capacity;
@@ -249,7 +248,7 @@ bool aimdGpuFrameActive(aimdContext* ctx, uint32_t frameIndex) {
 uint32_t aimdGpuBeginFrame(agfxCommandBuffer* commandBuffer, uint32_t frameIndex) {
     aimdContext* ctx = aimdCurrent();
     if (!ctx || !ctx->gpu.enabled || !commandBuffer || frameIndex >= ctx->framesInFlight)
-        return kInvalidHandle;
+        return AIMD_GPU_INVALID_HANDLE;
     aimdGpuState& gpu = ctx->gpu;
 
     gpu.beginCount++;
@@ -264,7 +263,7 @@ uint32_t aimdGpuBeginFrame(agfxCommandBuffer* commandBuffer, uint32_t frameIndex
 
     aimdGpuApplyReadback(ctx, frameIndex);
     if (!gpu.geometry.buffer)
-        return kInvalidHandle;
+        return AIMD_GPU_INVALID_HANDLE;
 
     aimdGpuHeader header = {};
     header.geometry = (uint32_t)agfxBufferViewGetHandle(gpu.geometry.writeView);

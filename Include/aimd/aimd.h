@@ -5,8 +5,8 @@
  * AIMD -- Amélie's Immediate Mode Debug renderer.
  *
  * Usage:
- *   1. Compile Shaders/AIMD.hlsl (entry points LineVS, PointVS, TriangleVS, MainPS) with agfx_shader and
- *      create the shader modules. AIMD takes ownership of them.
+ *   1. Compile AIMD.hlsl (entry points LineVS, PointVS, TriangleVS, MainPS) with agfx_shader and create the shader
+ *      modules. AIMD takes ownership of them.
  *   2. aimdContextCreate() once. The new context becomes the current one.
  *   3. Anywhere during the frame, call the aimd* shape functions. They use the current style (see aimdPushStyle).
  *   4. aimdExecute() once per frame: uploads, renders into the given targets, and hands projected text
@@ -15,7 +15,7 @@
  * GPU-driven usage (aimdContextCreateInfo::enableGpu):
  *   1. After waiting for the frame's fence and beginning its command buffer, call aimdGpuBeginFrame(). It returns a
  *      bindless handle to pass to your shaders (e.g. through push constants).
- *   2. In compute shaders recorded on that command buffer, #include "Shaders/AIMDDebug.hlsli" and draw:
+ *   2. In compute shaders recorded on that command buffer, #include "AIMDDebug.hlsli" and draw:
  *          AIMDDebugRenderer renderer = AIMDDebugRenderer::Create(handle);
  *          renderer.SetColor(AIMDColor(float4(0, 1, 0, 1)));
  *          renderer.DrawBox(transform);
@@ -55,7 +55,7 @@ typedef struct aimdContextCreateInfo {
     agfxDevice* device;
     /// @brief Number of frames that may be in flight at once. aimdExecuteInfo::frameIndex must be < this.
     uint32_t framesInFlight;
-    /// @brief Modules compiled from Shaders/AIMD.hlsl. AIMD takes ownership and destroys them in aimdContextDestroy.
+    /// @brief Modules compiled from AIMD.hlsl. AIMD takes ownership and destroys them in aimdContextDestroy.
     agfxShaderModule* lineVertexShader;     // LineVS
     agfxShaderModule* pointVertexShader;    // PointVS
     agfxShaderModule* triangleVertexShader; // TriangleVS
@@ -63,9 +63,9 @@ typedef struct aimdContextCreateInfo {
     /// @brief Initial capacity of each GPU primitive buffer, in primitives. 0 picks a default. Buffers grow on demand.
     uint32_t initialCapacity;
 
-    /// @brief Enables the GPU-driven path (aimdGpuBeginFrame + Shaders/AIMDDebug.hlsli).
+    /// @brief Enables the GPU-driven path (aimdGpuBeginFrame + AIMDDebug.hlsli).
     aimdBool enableGpu;
-    /// @brief FinalizeCS from Shaders/AIMD.hlsl. Required when enableGpu is set. AIMD takes ownership.
+    /// @brief FinalizeCS from AIMD.hlsl. Required when enableGpu is set. AIMD takes ownership.
     agfxShaderModule* finalizeComputeShader;
     /// @brief Initial capacity of each GPU-written region (triangle vertices, lines or points, per depth bucket).
     ///        0 picks a default. Shapes that don't fit are dropped.
@@ -244,8 +244,10 @@ void aimdGetStats(aimdStats* stats);
 // GPU-driven rendering
 //
 
+#define AIMD_GPU_INVALID_HANDLE 0xFFFFFFFFu
+
 /// @brief Starts a GPU-driven frame: applies pending growth, resets the GPU counters (recorded on commandBuffer) and
-///        returns the handle to pass to AIMDDebugRenderer::Create. Returns 0xFFFFFFFF if GPU mode is disabled.
+///        returns the handle to pass to AIMDDebugRenderer::Create. Returns AIMD_GPU_INVALID_HANDLE if GPU mode is disabled.
 /// @note  Call it after waiting for frameIndex's previous submission, on the command buffer that will also receive
 ///        your shape-emitting compute passes and then aimdExecute (same frameIndex). No barriers are needed around
 ///        your compute passes: AIMD records them.

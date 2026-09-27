@@ -13,6 +13,27 @@
 - **GPU-driven mode:** emit the same shapes from your compute shaders, for example straight from your culling pass. AIMD draws them with indirect draws and can grow its buffers automatically.
 - **C API:** plain C, implemented in C++.
 
+## Integration
+
+Copy the three files in [`dist/`](dist) into your project:
+
+| File | What it is |
+|---|---|
+| `dist/aimd.h` | The whole library as a single header: C API, plus the implementation under `AIMD_IMPLEMENTATION` |
+| `dist/AIMD.hlsl` | AIMD's shaders, compile them with agfx_shader and hand the modules to `aimdContextCreate` |
+| `dist/AIMDDebug.hlsli` | Only for the GPU-driven path: include it from your own shaders |
+
+In exactly one C++17 file:
+
+```cpp
+#define AIMD_IMPLEMENTATION
+#include "aimd.h"
+```
+
+Include `aimd.h` without the define anywhere else, from C or C++. AIMD needs [agfx](ThirdParty/agfx). If you build with xmake, you can also depend on the `aimd` target, which compiles `Source/` directly.
+
+`dist/` is generated from `Include/`, `Source/` and `Shaders/` with `xmake amalgamate`. Building the demo regenerates it too, so don't edit it by hand.
+
 ## Usage
 
 ### CPU
@@ -21,7 +42,7 @@
 aimdContextCreateInfo info = {0};
 info.device = device;
 info.framesInFlight = 3;
-info.lineVertexShader = ...;     // Compiled from Shaders/AIMD.hlsl: LineVS, PointVS, TriangleVS, MainPS
+info.lineVertexShader = ...;     // Compiled from AIMD.hlsl: LineVS, PointVS, TriangleVS, MainPS
 info.pointVertexShader = ...;
 info.triangleVertexShader = ...;
 info.fragmentShader = ...;
@@ -53,15 +74,15 @@ Matrices are column-major with column vectors (the glm layout), and clip depth i
 
 ### GPU
 
-To use GPU mode, create the context with `enableGpu = 1` and pass it `finalizeComputeShader` (`FinalizeCS` from `Shaders/AIMD.hlsl`). Then call `aimdGpuBeginFrame` each frame and pass the handle it returns to your shaders:
+To use GPU mode, create the context with `enableGpu = 1` and pass it `finalizeComputeShader` (`FinalizeCS` from `AIMD.hlsl`). Then call `aimdGpuBeginFrame` each frame and pass the handle it returns to your shaders:
 
 ```c
-uint32_t handle = aimdGpuBeginFrame(cmd, frameIndex);
+uint32_t handle = aimdGpuBeginFrame(cmd, frameIndex); // AIMD_GPU_INVALID_HANDLE if GPU mode is off
 // ... dispatch your compute shaders with 'handle', then aimdExecute() as usual
 ```
 
 ```hlsl
-#include "Shaders/AIMDDebug.hlsli"
+#include "AIMDDebug.hlsli"
 
 AIMDDebugRenderer renderer = AIMDDebugRenderer::Create(handle);
 renderer.SetColor(float4(0.0, 1.0, 0.0, 1.0));
@@ -86,8 +107,14 @@ In the demo, hold the right mouse button to look around, move with WASD, and use
 
 | Path | Contents |
 |---|---|
+| `dist/` | Ready-to-copy single-header build and shaders (generated) |
 | `Include/aimd/aimd.h` | Public API |
 | `Source/` | Implementation |
 | `Shaders/AIMD.hlsl` | AIMD's shaders |
 | `Shaders/AIMDDebug.hlsli` | HLSL API for GPU-driven drawing |
-| `Demo/` | SDL3 + ImGui demo |
+| `Scripts/amalgamate.lua` | Generates `dist/` (`xmake amalgamate`) |
+| `Demo/main.cpp` | Every AIMD integration step, in one file |
+| `Demo/Showcase.*` | CPU-side shapes and the ImGui style panel |
+| `Demo/GpuScene.*`, `Demo/Shaders/GpuScene.hlsl` | GPU-driven shapes from a compute pass |
+| `Demo/Platform.*` | Window, device, swap chain, ImGui (no AIMD) |
+| `ThirdParty/` | agfx, plus the shader compiler and ImGui backend used by the demo |

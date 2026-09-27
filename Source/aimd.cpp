@@ -10,14 +10,14 @@
 #include <cstdio>
 #include <cstring>
 
-static aimdContext* sCurrentContext = nullptr;
+static aimdContext* sAimdCurrentContext = nullptr;
 
 // Distance-relative depth bias applied to lines and points so wireframes drawn over their own filled shape win.
-static constexpr float kLineDepthBias = 0.002f;
-static constexpr uint64_t kDefaultCapacity = 4096;
+static constexpr float AIMD_LINE_DEPTH_BIAS = 0.002f;
+static constexpr uint64_t AIMD_DEFAULT_CAPACITY = 4096;
 
 aimdContext* aimdCurrent() {
-    return sCurrentContext;
+    return sAimdCurrentContext;
 }
 
 //
@@ -36,7 +36,7 @@ aimdContext* aimdContextCreate(const aimdContextCreateInfo* createInfo) {
     ctx->vertexShaders[AIMD_KIND_LINES] = createInfo->lineVertexShader;
     ctx->vertexShaders[AIMD_KIND_POINTS] = createInfo->pointVertexShader;
     ctx->fragmentShader = createInfo->fragmentShader;
-    ctx->initialCapacity = createInfo->initialCapacity ? createInfo->initialCapacity : kDefaultCapacity;
+    ctx->initialCapacity = createInfo->initialCapacity ? createInfo->initialCapacity : AIMD_DEFAULT_CAPACITY;
     ctx->uploadBuffers.resize(ctx->framesInFlight * AIMD_KIND_COUNT);
     ctx->styleStack.push_back(aimdDefaultStyle());
 
@@ -45,7 +45,7 @@ aimdContext* aimdContextCreate(const aimdContextCreateInfo* createInfo) {
         return nullptr;
     }
 
-    sCurrentContext = ctx;
+    sAimdCurrentContext = ctx;
     return ctx;
 }
 
@@ -70,17 +70,17 @@ void aimdContextDestroy(aimdContext* ctx) {
         agfxShaderModuleDestroy(ctx->device, module);
     agfxShaderModuleDestroy(ctx->device, ctx->fragmentShader);
 
-    if (sCurrentContext == ctx)
-        sCurrentContext = nullptr;
+    if (sAimdCurrentContext == ctx)
+        sAimdCurrentContext = nullptr;
     delete ctx;
 }
 
 void aimdSetCurrentContext(aimdContext* context) {
-    sCurrentContext = context;
+    sAimdCurrentContext = context;
 }
 
 aimdContext* aimdGetCurrentContext(void) {
-    return sCurrentContext;
+    return sAimdCurrentContext;
 }
 
 //
@@ -491,7 +491,7 @@ void aimdExecute(const aimdExecuteInfo* info) {
                 aimdPushConstants regionPc = pc;
                 regionPc.buffer = (uint32_t)agfxBufferViewGetHandle(ctx->gpu.geometry.readView);
                 regionPc.firstPrimitive = ctx->gpu.regionOffset[region];
-                regionPc.depthBias = kind == AIMD_KIND_TRIANGLES ? 0.0f : kLineDepthBias;
+                regionPc.depthBias = kind == AIMD_KIND_TRIANGLES ? 0.0f : AIMD_LINE_DEPTH_BIAS;
 
                 agfxIndirectBundleExecuteInfo& draw = gpuDraws[region];
                 draw.countIndex = region;
@@ -534,7 +534,7 @@ void aimdExecute(const aimdExecuteInfo* info) {
                     if (agfxRenderPipeline* pipeline = pipelineFor(kind, bucket, false)) {
                         pc.buffer = (uint32_t)agfxBufferViewGetHandle(frameBuffers[kind].view);
                         pc.firstPrimitive = bucket == AIMD_BUCKET_DEPTH ? 0 : counts[kind][AIMD_BUCKET_DEPTH];
-                        pc.depthBias = kind == AIMD_KIND_TRIANGLES ? 0.0f : kLineDepthBias;
+                        pc.depthBias = kind == AIMD_KIND_TRIANGLES ? 0.0f : AIMD_LINE_DEPTH_BIAS;
 
                         agfxRenderPassSetPipeline(pass, pipeline);
                         agfxRenderPassPushConstants(pass, &pc, sizeof(pc));

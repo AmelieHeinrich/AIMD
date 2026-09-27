@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <aimd/aimd.h>
+#include <aimd.h>
 #include <stdint.h>
 
 enum ShowcaseShape {

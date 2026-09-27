@@ -10,10 +10,10 @@
 #include <cmath>
 #include <algorithm>
 
-static constexpr float kPi = 3.14159265358979323846f;
-static constexpr uint32_t kColorX = AIMD_RGBA(235, 64, 52, 255);
-static constexpr uint32_t kColorY = AIMD_RGBA(90, 200, 70, 255);
-static constexpr uint32_t kColorZ = AIMD_RGBA(60, 120, 240, 255);
+static constexpr float AIMD_PI = 3.14159265358979323846f;
+static constexpr uint32_t AIMD_COLOR_X = AIMD_RGBA(235, 64, 52, 255);
+static constexpr uint32_t AIMD_COLOR_Y = AIMD_RGBA(90, 200, 70, 255);
+static constexpr uint32_t AIMD_COLOR_Z = AIMD_RGBA(60, 120, 240, 255);
 
 //
 // Math helpers
@@ -22,36 +22,36 @@ static constexpr uint32_t kColorZ = AIMD_RGBA(60, 120, 240, 255);
 static aimdVec3 operator+(aimdVec3 a, aimdVec3 b) { return { a.x + b.x, a.y + b.y, a.z + b.z }; }
 static aimdVec3 operator-(aimdVec3 a, aimdVec3 b) { return { a.x - b.x, a.y - b.y, a.z - b.z }; }
 static aimdVec3 operator*(aimdVec3 a, float s) { return { a.x * s, a.y * s, a.z * s }; }
-static float dot(aimdVec3 a, aimdVec3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-static float length(aimdVec3 a) { return std::sqrt(dot(a, a)); }
-static aimdVec3 cross(aimdVec3 a, aimdVec3 b) {
+static float aimdDot(aimdVec3 a, aimdVec3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+static float aimdLength(aimdVec3 a) { return std::sqrt(aimdDot(a, a)); }
+static aimdVec3 aimdCross(aimdVec3 a, aimdVec3 b) {
     return { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
 }
-static aimdVec3 normalize(aimdVec3 a) {
-    float len = length(a);
+static aimdVec3 aimdNormalize(aimdVec3 a) {
+    float len = aimdLength(a);
     return len > 1e-12f ? a * (1.0f / len) : aimdVec3{ 0.0f, 1.0f, 0.0f };
 }
 
 // Column-major transform of a point, without the perspective divide.
-static aimdVec3 transformPoint(const float m[16], aimdVec3 p) {
+static aimdVec3 aimdTransformPoint(const float m[16], aimdVec3 p) {
     return { m[0] * p.x + m[4] * p.y + m[8] * p.z + m[12],
              m[1] * p.x + m[5] * p.y + m[9] * p.z + m[13],
              m[2] * p.x + m[6] * p.y + m[10] * p.z + m[14] };
 }
 
 // Two unit vectors perpendicular to n and to each other.
-static void basis(aimdVec3 n, aimdVec3& u, aimdVec3& v) {
-    n = normalize(n);
+static void aimdBasis(aimdVec3 n, aimdVec3& u, aimdVec3& v) {
+    n = aimdNormalize(n);
     aimdVec3 helper = std::fabs(n.x) > 0.9f ? aimdVec3{ 0.0f, 1.0f, 0.0f } : aimdVec3{ 1.0f, 0.0f, 0.0f };
-    u = normalize(cross(helper, n));
-    v = cross(n, u);
+    u = aimdNormalize(aimdCross(helper, n));
+    v = aimdCross(n, u);
 }
 
-static uint32_t segmentCount(const aimdStyle& style) {
+static uint32_t aimdSegmentCount(const aimdStyle& style) {
     return std::clamp<uint32_t>(style.segments, 3, 256);
 }
 
-static bool isFilled(const aimdStyle& style) {
+static bool aimdIsFilled(const aimdStyle& style) {
     return (style.flags & AIMD_STYLE_FILLED) != 0;
 }
 
@@ -60,65 +60,65 @@ static bool isFilled(const aimdStyle& style) {
 //
 
 // Corner i has x from bit 0, y from bit 1, z from bit 2.
-static const int kBoxEdges[12][2] = {
+static const int AIMD_BOX_EDGES[12][2] = {
     { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 }, // along x
     { 0, 2 }, { 1, 3 }, { 4, 6 }, { 5, 7 }, // along y
     { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 }, // along z
 };
-static const int kBoxFaces[6][4] = {
+static const int AIMD_BOX_FACES[6][4] = {
     { 0, 2, 6, 4 }, { 1, 5, 7, 3 }, // -x, +x
     { 0, 4, 5, 1 }, { 2, 3, 7, 6 }, // -y, +y
     { 0, 1, 3, 2 }, { 4, 6, 7, 5 }, // -z, +z
 };
 
-static void emitHexahedron(aimdContext* ctx, const aimdStyle& style, const aimdVec3 corners[8]) {
-    if (isFilled(style)) {
+static void aimdEmitHexahedron(aimdContext* ctx, const aimdStyle& style, const aimdVec3 corners[8]) {
+    if (aimdIsFilled(style)) {
         aimdVec3 center = { 0.0f, 0.0f, 0.0f };
         for (int i = 0; i < 8; ++i)
             center = center + corners[i] * 0.125f;
 
-        for (const auto& face : kBoxFaces) {
+        for (const auto& face : AIMD_BOX_FACES) {
             const aimdVec3 &a = corners[face[0]], &b = corners[face[1]], &c = corners[face[2]], &d = corners[face[3]];
             // Orient the face normal away from the center, so any transform (even a mirroring one) works.
-            aimdVec3 n = normalize(cross(c - a, b - a) + cross(d - a, c - a));
-            if (dot(n, (a + c) * 0.5f - center) < 0.0f)
+            aimdVec3 n = aimdNormalize(aimdCross(c - a, b - a) + aimdCross(d - a, c - a));
+            if (aimdDot(n, (a + c) * 0.5f - center) < 0.0f)
                 n = n * -1.0f;
             aimdEmitTriangleN(ctx, style, a, b, c, n, n, n, style.color, true);
             aimdEmitTriangleN(ctx, style, a, c, d, n, n, n, style.color, true);
         }
     } else {
-        for (const auto& edge : kBoxEdges)
+        for (const auto& edge : AIMD_BOX_EDGES)
             aimdEmitLine(ctx, style, corners[edge[0]], corners[edge[1]], style.color);
     }
 }
 
 // Unit direction of circle point i (may be fractional, for mid-segment normals).
-static aimdVec3 circleDir(aimdVec3 u, aimdVec3 v, float i, uint32_t segments) {
-    float angle = 2.0f * kPi * i / (float)segments;
+static aimdVec3 aimdCircleDir(aimdVec3 u, aimdVec3 v, float i, uint32_t segments) {
+    float angle = 2.0f * AIMD_PI * i / (float)segments;
     return u * std::cos(angle) + v * std::sin(angle);
 }
 
-static aimdVec3 circlePoint(aimdVec3 center, aimdVec3 u, aimdVec3 v, float radius, uint32_t i, uint32_t segments) {
-    return center + circleDir(u, v, (float)i, segments) * radius;
+static aimdVec3 aimdCirclePoint(aimdVec3 center, aimdVec3 u, aimdVec3 v, float radius, uint32_t i, uint32_t segments) {
+    return center + aimdCircleDir(u, v, (float)i, segments) * radius;
 }
 
-static void emitCircleOutline(aimdContext* ctx, const aimdStyle& style, aimdVec3 center, aimdVec3 u, aimdVec3 v, float radius, uint32_t color) {
-    uint32_t segments = segmentCount(style);
-    aimdVec3 prev = circlePoint(center, u, v, radius, 0, segments);
+static void aimdEmitCircleOutline(aimdContext* ctx, const aimdStyle& style, aimdVec3 center, aimdVec3 u, aimdVec3 v, float radius, uint32_t color) {
+    uint32_t segments = aimdSegmentCount(style);
+    aimdVec3 prev = aimdCirclePoint(center, u, v, radius, 0, segments);
     for (uint32_t i = 1; i <= segments; ++i) {
-        aimdVec3 next = circlePoint(center, u, v, radius, i, segments);
+        aimdVec3 next = aimdCirclePoint(center, u, v, radius, i, segments);
         aimdEmitLine(ctx, style, prev, next, color);
         prev = next;
     }
 }
 
 // Two-sided disc, or one side of a closed shape when 'outward' is given.
-static void emitDisc(aimdContext* ctx, const aimdStyle& style, aimdVec3 center, aimdVec3 u, aimdVec3 v, float radius, uint32_t color,
+static void aimdEmitDisc(aimdContext* ctx, const aimdStyle& style, aimdVec3 center, aimdVec3 u, aimdVec3 v, float radius, uint32_t color,
                      const aimdVec3* outward = nullptr) {
-    uint32_t segments = segmentCount(style);
-    aimdVec3 prev = circlePoint(center, u, v, radius, 0, segments);
+    uint32_t segments = aimdSegmentCount(style);
+    aimdVec3 prev = aimdCirclePoint(center, u, v, radius, 0, segments);
     for (uint32_t i = 1; i <= segments; ++i) {
-        aimdVec3 next = circlePoint(center, u, v, radius, i, segments);
+        aimdVec3 next = aimdCirclePoint(center, u, v, radius, i, segments);
         if (outward)
             aimdEmitTriangleN(ctx, style, center, prev, next, *outward, *outward, *outward, color, true);
         else
@@ -128,40 +128,40 @@ static void emitDisc(aimdContext* ctx, const aimdStyle& style, aimdVec3 center, 
 }
 
 // Number of apex/side lines drawn on wireframe cones and cylinders.
-static uint32_t sideLineStep(uint32_t segments) {
+static uint32_t aimdSideLineStep(uint32_t segments) {
     return std::max<uint32_t>(1, segments / 8);
 }
 
-static void emitCone(aimdContext* ctx, const aimdStyle& style, aimdVec3 apex, aimdVec3 baseCenter, float radius, uint32_t color) {
+static void aimdEmitCone(aimdContext* ctx, const aimdStyle& style, aimdVec3 apex, aimdVec3 baseCenter, float radius, uint32_t color) {
     aimdVec3 u, v;
-    basis(apex - baseCenter, u, v);
-    uint32_t segments = segmentCount(style);
+    aimdBasis(apex - baseCenter, u, v);
+    uint32_t segments = aimdSegmentCount(style);
 
-    if (isFilled(style)) {
+    if (aimdIsFilled(style)) {
         aimdVec3 axis = apex - baseCenter;
-        float height = length(axis);
-        axis = normalize(axis);
+        float height = aimdLength(axis);
+        axis = aimdNormalize(axis);
         // Side normal: tilt the radial direction toward the apex by the cone's slope.
-        auto sideNormal = [&](float i) { return normalize(circleDir(u, v, i, segments) * height + axis * radius); };
+        auto sideNormal = [&](float i) { return aimdNormalize(aimdCircleDir(u, v, i, segments) * height + axis * radius); };
 
-        aimdVec3 prev = circlePoint(baseCenter, u, v, radius, 0, segments);
+        aimdVec3 prev = aimdCirclePoint(baseCenter, u, v, radius, 0, segments);
         for (uint32_t i = 1; i <= segments; ++i) {
-            aimdVec3 next = circlePoint(baseCenter, u, v, radius, i, segments);
+            aimdVec3 next = aimdCirclePoint(baseCenter, u, v, radius, i, segments);
             aimdEmitTriangleN(ctx, style, apex, prev, next, sideNormal((float)i - 0.5f), sideNormal((float)(i - 1)), sideNormal((float)i), color, true);
             prev = next;
         }
         aimdVec3 down = axis * -1.0f;
-        emitDisc(ctx, style, baseCenter, u, v, radius, color, &down);
+        aimdEmitDisc(ctx, style, baseCenter, u, v, radius, color, &down);
     } else {
-        emitCircleOutline(ctx, style, baseCenter, u, v, radius, color);
-        for (uint32_t i = 0; i < segments; i += sideLineStep(segments))
-            aimdEmitLine(ctx, style, apex, circlePoint(baseCenter, u, v, radius, i, segments), color);
+        aimdEmitCircleOutline(ctx, style, baseCenter, u, v, radius, color);
+        for (uint32_t i = 0; i < segments; i += aimdSideLineStep(segments))
+            aimdEmitLine(ctx, style, apex, aimdCirclePoint(baseCenter, u, v, radius, i, segments), color);
     }
 }
 
-static void emitArrow(aimdContext* ctx, const aimdStyle& style, aimdVec3 from, aimdVec3 to, float headSize, uint32_t color) {
+static void aimdEmitArrow(aimdContext* ctx, const aimdStyle& style, aimdVec3 from, aimdVec3 to, float headSize, uint32_t color) {
     aimdVec3 dir = to - from;
-    float len = length(dir);
+    float len = aimdLength(dir);
     if (len < 1e-6f)
         return;
     dir = dir * (1.0f / len);
@@ -173,8 +173,8 @@ static void emitArrow(aimdContext* ctx, const aimdStyle& style, aimdVec3 from, a
         aimdEmitLine(ctx, style, from, headBase, color);
 
     aimdStyle headStyle = style;
-    headStyle.segments = std::min<uint32_t>(segmentCount(style), 16);
-    emitCone(ctx, headStyle, to, headBase, head * 0.35f, color);
+    headStyle.segments = std::min<uint32_t>(aimdSegmentCount(style), 16);
+    aimdEmitCone(ctx, headStyle, to, headBase, head * 0.35f, color);
 }
 
 //
@@ -192,9 +192,9 @@ void aimdBox(const float transform[16]) {
     aimdVec3 corners[8];
     for (int i = 0; i < 8; ++i) {
         aimdVec3 local = { (i & 1) ? 0.5f : -0.5f, (i & 2) ? 0.5f : -0.5f, (i & 4) ? 0.5f : -0.5f };
-        corners[i] = transformPoint(transform, local);
+        corners[i] = aimdTransformPoint(transform, local);
     }
-    emitHexahedron(ctx, style, corners);
+    aimdEmitHexahedron(ctx, style, corners);
 }
 
 void aimdAABB(aimdVec3 min, aimdVec3 max) {
@@ -202,7 +202,7 @@ void aimdAABB(aimdVec3 min, aimdVec3 max) {
     aimdVec3 corners[8];
     for (int i = 0; i < 8; ++i)
         corners[i] = { (i & 1) ? max.x : min.x, (i & 2) ? max.y : min.y, (i & 4) ? max.z : min.z };
-    emitHexahedron(ctx, style, corners);
+    aimdEmitHexahedron(ctx, style, corners);
 }
 
 void aimdFrustum(const float m[16]) {
@@ -216,34 +216,34 @@ void aimdFrustum(const float m[16]) {
         // A plane at infinity (infinite projection) has no finite corners to draw.
         if (std::fabs(w) < 1e-7f)
             return;
-        corners[i] = transformPoint(m, { x, y, z }) * (1.0f / w);
+        corners[i] = aimdTransformPoint(m, { x, y, z }) * (1.0f / w);
     }
-    emitHexahedron(ctx, style, corners);
+    aimdEmitHexahedron(ctx, style, corners);
 }
 
 void aimdCone(aimdVec3 apex, aimdVec3 baseCenter, float radius) {
     AIMD_SHAPE_PROLOGUE();
-    emitCone(ctx, style, apex, baseCenter, radius, style.color);
+    aimdEmitCone(ctx, style, apex, baseCenter, radius, style.color);
 }
 
 void aimdCylinder(aimdVec3 a, aimdVec3 b, float radius) {
     AIMD_SHAPE_PROLOGUE();
     aimdVec3 u, v;
-    basis(b - a, u, v);
-    uint32_t segments = segmentCount(style);
+    aimdBasis(b - a, u, v);
+    uint32_t segments = aimdSegmentCount(style);
 
-    if (isFilled(style)) {
-        aimdVec3 axis = normalize(b - a);
+    if (aimdIsFilled(style)) {
+        aimdVec3 axis = aimdNormalize(b - a);
         aimdVec3 down = axis * -1.0f;
-        emitDisc(ctx, style, a, u, v, radius, style.color, &down);
-        emitDisc(ctx, style, b, u, v, radius, style.color, &axis);
-        aimdVec3 prevA = circlePoint(a, u, v, radius, 0, segments);
-        aimdVec3 prevB = circlePoint(b, u, v, radius, 0, segments);
-        aimdVec3 prevN = circleDir(u, v, 0.0f, segments);
+        aimdEmitDisc(ctx, style, a, u, v, radius, style.color, &down);
+        aimdEmitDisc(ctx, style, b, u, v, radius, style.color, &axis);
+        aimdVec3 prevA = aimdCirclePoint(a, u, v, radius, 0, segments);
+        aimdVec3 prevB = aimdCirclePoint(b, u, v, radius, 0, segments);
+        aimdVec3 prevN = aimdCircleDir(u, v, 0.0f, segments);
         for (uint32_t i = 1; i <= segments; ++i) {
-            aimdVec3 nextA = circlePoint(a, u, v, radius, i, segments);
-            aimdVec3 nextB = circlePoint(b, u, v, radius, i, segments);
-            aimdVec3 nextN = circleDir(u, v, (float)i, segments);
+            aimdVec3 nextA = aimdCirclePoint(a, u, v, radius, i, segments);
+            aimdVec3 nextB = aimdCirclePoint(b, u, v, radius, i, segments);
+            aimdVec3 nextN = aimdCircleDir(u, v, (float)i, segments);
             aimdEmitTriangleN(ctx, style, prevA, nextA, nextB, prevN, nextN, nextN, style.color, true);
             aimdEmitTriangleN(ctx, style, prevA, nextB, prevB, prevN, nextN, prevN, style.color, true);
             prevA = nextA;
@@ -251,61 +251,61 @@ void aimdCylinder(aimdVec3 a, aimdVec3 b, float radius) {
             prevN = nextN;
         }
     } else {
-        emitCircleOutline(ctx, style, a, u, v, radius, style.color);
-        emitCircleOutline(ctx, style, b, u, v, radius, style.color);
-        for (uint32_t i = 0; i < segments; i += sideLineStep(segments))
-            aimdEmitLine(ctx, style, circlePoint(a, u, v, radius, i, segments), circlePoint(b, u, v, radius, i, segments), style.color);
+        aimdEmitCircleOutline(ctx, style, a, u, v, radius, style.color);
+        aimdEmitCircleOutline(ctx, style, b, u, v, radius, style.color);
+        for (uint32_t i = 0; i < segments; i += aimdSideLineStep(segments))
+            aimdEmitLine(ctx, style, aimdCirclePoint(a, u, v, radius, i, segments), aimdCirclePoint(b, u, v, radius, i, segments), style.color);
     }
 }
 
 void aimdArrow(aimdVec3 from, aimdVec3 to, float headSize) {
     AIMD_SHAPE_PROLOGUE();
-    emitArrow(ctx, style, from, to, headSize, style.color);
+    aimdEmitArrow(ctx, style, from, to, headSize, style.color);
 }
 
 void aimdAxes(const float transform[16], float size) {
     AIMD_SHAPE_PROLOGUE();
     aimdVec3 origin = { transform[12], transform[13], transform[14] };
     aimdVec3 axes[3] = {
-        normalize({ transform[0], transform[1], transform[2] }),
-        normalize({ transform[4], transform[5], transform[6] }),
-        normalize({ transform[8], transform[9], transform[10] }),
+        aimdNormalize({ transform[0], transform[1], transform[2] }),
+        aimdNormalize({ transform[4], transform[5], transform[6] }),
+        aimdNormalize({ transform[8], transform[9], transform[10] }),
     };
-    const uint32_t colors[3] = { kColorX, kColorY, kColorZ };
+    const uint32_t colors[3] = { AIMD_COLOR_X, AIMD_COLOR_Y, AIMD_COLOR_Z };
     for (int i = 0; i < 3; ++i)
-        emitArrow(ctx, style, origin, origin + axes[i] * size, size * 0.2f, colors[i]);
+        aimdEmitArrow(ctx, style, origin, origin + axes[i] * size, size * 0.2f, colors[i]);
 }
 
 void aimdCircle(aimdVec3 center, aimdVec3 normal, float radius) {
     AIMD_SHAPE_PROLOGUE();
     aimdVec3 u, v;
-    basis(normal, u, v);
-    if (isFilled(style))
-        emitDisc(ctx, style, center, u, v, radius, style.color);
+    aimdBasis(normal, u, v);
+    if (aimdIsFilled(style))
+        aimdEmitDisc(ctx, style, center, u, v, radius, style.color);
     else
-        emitCircleOutline(ctx, style, center, u, v, radius, style.color);
+        aimdEmitCircleOutline(ctx, style, center, u, v, radius, style.color);
 }
 
 void aimdRing(aimdVec3 center, aimdVec3 normal, float innerRadius, float outerRadius) {
     AIMD_SHAPE_PROLOGUE();
     aimdVec3 u, v;
-    basis(normal, u, v);
-    uint32_t segments = segmentCount(style);
+    aimdBasis(normal, u, v);
+    uint32_t segments = aimdSegmentCount(style);
 
-    if (isFilled(style)) {
-        aimdVec3 prevIn = circlePoint(center, u, v, innerRadius, 0, segments);
-        aimdVec3 prevOut = circlePoint(center, u, v, outerRadius, 0, segments);
+    if (aimdIsFilled(style)) {
+        aimdVec3 prevIn = aimdCirclePoint(center, u, v, innerRadius, 0, segments);
+        aimdVec3 prevOut = aimdCirclePoint(center, u, v, outerRadius, 0, segments);
         for (uint32_t i = 1; i <= segments; ++i) {
-            aimdVec3 nextIn = circlePoint(center, u, v, innerRadius, i, segments);
-            aimdVec3 nextOut = circlePoint(center, u, v, outerRadius, i, segments);
+            aimdVec3 nextIn = aimdCirclePoint(center, u, v, innerRadius, i, segments);
+            aimdVec3 nextOut = aimdCirclePoint(center, u, v, outerRadius, i, segments);
             aimdEmitTriangle(ctx, style, prevIn, prevOut, nextOut, style.color);
             aimdEmitTriangle(ctx, style, prevIn, nextOut, nextIn, style.color);
             prevIn = nextIn;
             prevOut = nextOut;
         }
     } else {
-        emitCircleOutline(ctx, style, center, u, v, innerRadius, style.color);
-        emitCircleOutline(ctx, style, center, u, v, outerRadius, style.color);
+        aimdEmitCircleOutline(ctx, style, center, u, v, innerRadius, style.color);
+        aimdEmitCircleOutline(ctx, style, center, u, v, outerRadius, style.color);
     }
 }
 
@@ -313,14 +313,14 @@ void aimdRings(aimdVec3 center, float radius) {
     AIMD_SHAPE_PROLOGUE();
     const aimdVec3 x = { 1.0f, 0.0f, 0.0f }, y = { 0.0f, 1.0f, 0.0f }, z = { 0.0f, 0.0f, 1.0f };
     // Each ring is colored after the axis it rotates around.
-    emitCircleOutline(ctx, style, center, y, z, radius, kColorX);
-    emitCircleOutline(ctx, style, center, z, x, radius, kColorY);
-    emitCircleOutline(ctx, style, center, x, y, radius, kColorZ);
+    aimdEmitCircleOutline(ctx, style, center, y, z, radius, AIMD_COLOR_X);
+    aimdEmitCircleOutline(ctx, style, center, z, x, radius, AIMD_COLOR_Y);
+    aimdEmitCircleOutline(ctx, style, center, x, y, radius, AIMD_COLOR_Z);
 }
 
 void aimdSphere(aimdVec3 center, float radius) {
     AIMD_SHAPE_PROLOGUE();
-    uint32_t segments = segmentCount(style);
+    uint32_t segments = aimdSegmentCount(style);
     aimdSphereEx(center, radius, std::max<uint32_t>(2, segments / 2), segments);
 }
 
@@ -332,12 +332,12 @@ void aimdSphereEx(aimdVec3 center, float radius, uint32_t rings, uint32_t sector
 
     // Unit direction at latitude index 'ring' (0 = north pole .. rings = south pole) and longitude index 'sector'.
     auto sphereDir = [&](uint32_t ring, uint32_t sector) {
-        float theta = kPi * (float)ring / (float)rings;
-        float phi = 2.0f * kPi * (float)sector / (float)sectors;
+        float theta = AIMD_PI * (float)ring / (float)rings;
+        float phi = 2.0f * AIMD_PI * (float)sector / (float)sectors;
         return y * std::cos(theta) + (x * std::cos(phi) + z * std::sin(phi)) * std::sin(theta);
     };
 
-    if (isFilled(style)) {
+    if (aimdIsFilled(style)) {
         for (uint32_t r = 0; r < rings; ++r) {
             for (uint32_t s = 0; s < sectors; ++s) {
                 aimdVec3 na = sphereDir(r, s), nb = sphereDir(r, s + 1);
@@ -367,7 +367,7 @@ void aimdGrid(aimdVec3 center, aimdVec3 normal, float size, uint32_t cells) {
     if (cells == 0)
         return;
     aimdVec3 u, v;
-    basis(normal, u, v);
+    aimdBasis(normal, u, v);
     float half = size * 0.5f;
     float step = size / (float)cells;
     for (uint32_t i = 0; i <= cells; ++i) {
@@ -376,3 +376,5 @@ void aimdGrid(aimdVec3 center, aimdVec3 normal, float size, uint32_t cells) {
         aimdEmitLine(ctx, style, center + v * offset - u * half, center + v * offset + u * half, style.color);
     }
 }
+
+#undef AIMD_SHAPE_PROLOGUE

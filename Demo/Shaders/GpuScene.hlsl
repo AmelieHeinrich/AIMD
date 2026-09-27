@@ -7,7 +7,8 @@
  * Entry point: SceneCS.
  */
 
-#include "Shaders/AIMDDebug.hlsli"
+// Resolved from the working directory: the demo runs from the project root
+#include "dist/AIMDDebug.hlsli"
 
 #if defined(AGFX_VULKAN)
     #define SCENE_PUSH_CONSTANTS(type, name) [[vk::push_constant]] ConstantBuffer<type> name : register(b0)
@@ -21,7 +22,7 @@ static const uint SCENE_SHADED = 1u << 2;
 static const uint SCENE_SPHERES = 1u << 3;
 static const uint SCENE_XRAY = 1u << 4;
 
-// Must match SceneConstants in Demo/main.cpp
+// Must match SceneConstants in Demo/GpuScene.cpp
 struct SceneConstants {
     column_major float4x4 cullViewProjection; // Finite, standard-Z projection
     uint aimdHandle;
